@@ -41,49 +41,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string): Promise<void> => {
     const { data } = await supabase
       .from("profiles")
       .select("id, full_name, email, username, role, status, custom_domain, plan_id, subscription_status, subscription_expires_at")
       .eq("id", userId)
       .maybeSingle();
-    if (data) setProfile(data as UserProfile);
-    else setProfile(null);
+    setProfile(data ? (data as UserProfile) : null);
   };
 
   useEffect(() => {
-    let initialized = false;
-
-    // Busca sessão inicial primeiro
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user.id);
-      }
-      setLoading(false);
-      initialized = true;
-    });
-
-    // Escuta mudanças de auth após inicialização
+    // Padrão oficial Supabase: onAuthStateChange como fonte única de verdade.
+    // O evento INITIAL_SESSION é disparado na inicialização com a sessão atual (ou null).
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      // Ignorar o evento inicial que duplica o getSession
-      if (!initialized && _event === "INITIAL_SESSION") return;
-
       setSession(session);
       setUser(session?.user ?? null);
+
       if (session?.user) {
         await fetchProfile(session.user.id);
       } else {
         setProfile(null);
       }
-      if (initialized) setLoading(false);
+
+      // Loading só termina após o primeiro evento (INITIAL_SESSION)
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const refreshProfile = async () => { if (user) await fetchProfile(user.id); };
+  const refreshProfile = async () => {
+    if (user) await fetchProfile(user.id);
+  };
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -92,13 +81,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string, fullName?: string, username?: string) => {
     const { error } = await supabase.auth.signUp({
-      email, password,
-      options: { emailRedirectTo: window.location.origin, data: { full_name: fullName || "", username: username || "" } },
+      email,
+      password,
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: { full_name: fullName || "", username: username || "" },
+      },
     });
     return { error: error?.message ?? null };
   };
 
-  const signOut = async () => { await supabase.auth.signOut(); setProfile(null); };
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setProfile(null);
+  };
 
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -108,13 +104,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{
-      session, user, profile, loading,
-      isMaster: profile?.role === "master",
-      isConsultant: profile?.role === "consultant",
-      isSuspended: profile?.status === "suspended",
-      signIn, signUp, signOut, resetPassword, refreshProfile,
-    }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        user,
+        profile,
+        loading,
+        isMaster: profile?.role === "master",
+        isConsultant: profile?.role === "consultant",
+        isSuspended: profile?.status === "suspended",
+        signIn,
+        signUp,
+        signOut,
+        resetPassword,
+        refreshProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
