@@ -123,7 +123,8 @@ const AdminSettings = () => {
       if (error) toast.error(error.message);
       else { setSettingsId(data.id); toast.success("Configurações criadas!"); }
     }
-    queryClient.invalidateQueries({ queryKey: ["site_settings_public"] });
+    queryClient.invalidateQueries({ queryKey: ["site_settings_by_user", user.id] });
+    queryClient.invalidateQueries({ queryKey: ["site_settings_by_username"] });
     setLoading(false);
   };
 

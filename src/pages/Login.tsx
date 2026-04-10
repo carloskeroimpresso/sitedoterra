@@ -20,7 +20,13 @@ const Login = () => {
   if (user && profile) {
     return <Navigate to={isMaster ? "/master" : "/admin"} replace />;
   }
-  if (user && !profile) return null; // loading profile
+  if (user && !profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--creme)" }}>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,13 +41,13 @@ const Login = () => {
     }
 
     if (isSignUp) {
-      const { error } = await signUp(email, password, fullName);
+      const { error } = await signUp(email, password, fullName, username);
       if (error) toast.error(error);
       else toast.success("Conta criada! Verifique seu e-mail para confirmar.");
     } else {
       const { error } = await signIn(email, password);
       if (error) toast.error(error);
-      else navigate("/admin");
+      // Navigation handled by the redirect below when profile loads
     }
     setLoading(false);
   };

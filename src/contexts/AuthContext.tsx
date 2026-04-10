@@ -27,7 +27,7 @@ interface AuthContextType {
   isConsultant: boolean;
   isSuspended: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, fullName?: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, fullName?: string, username?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
   refreshProfile: () => Promise<void>;
@@ -41,50 +41,75 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, full_name, email, username, role, status, custom_domain, plan_id, subscription_status, subscription_expires_at")
-      .eq("id", userId)
-      .maybeSingle();
-    if (data) setProfile(data as UserProfile);
+  const fetchProfile = async (userId: string): Promise<void> => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, username, role, status, custom_domain, plan_id, subscription_status, subscription_expires_at")
+        .eq("id", userId)
+        .maybeSingle();
+      if (!error && data) {
+        setProfile(data as UserProfile);
+      } else {
+        setProfile(null);
+      }
+    } catch {
+      setProfile(null);
+    }
   };
 
   useEffect(() => {
+    // Timeout de segurança: se em 8s o loading não terminou, força false
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 8000);
+
+    // Padrão oficial Supabase: onAuthStateChange como fonte única de verdade
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      clearTimeout(safetyTimer);
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) await fetchProfile(session.user.id);
-      else setProfile(null);
+
+      if (session?.user) {
+        await fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
+
       setLoading(false);
     });
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) await fetchProfile(session.user.id);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(safetyTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const refreshProfile = async () => { if (user) await fetchProfile(user.id); };
+  const refreshProfile = async () => {
+    if (user) await fetchProfile(user.id);
+  };
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error?.message ?? null };
   };
 
-  const signUp = async (email: string, password: string, fullName?: string) => {
+  const signUp = async (email: string, password: string, fullName?: string, username?: string) => {
     const { error } = await supabase.auth.signUp({
-      email, password,
-      options: { emailRedirectTo: window.location.origin, data: { full_name: fullName || "" } },
+      email,
+      password,
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: { full_name: fullName || "", username: username || "" },
+      },
     });
     return { error: error?.message ?? null };
   };
 
-  const signOut = async () => { await supabase.auth.signOut(); setProfile(null); };
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setProfile(null);
+  };
 
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -94,13 +119,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{
-      session, user, profile, loading,
-      isMaster: profile?.role === "master",
-      isConsultant: profile?.role === "consultant",
-      isSuspended: profile?.status === "suspended",
-      signIn, signUp, signOut, resetPassword, refreshProfile,
-    }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        user,
+        profile,
+        loading,
+        isMaster: profile?.role === "master",
+        isConsultant: profile?.role === "consultant",
+        isSuspended: profile?.status === "suspended",
+        signIn,
+        signUp,
+        signOut,
+        resetPassword,
+        refreshProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
