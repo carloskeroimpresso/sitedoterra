@@ -20,7 +20,13 @@ const Login = () => {
   if (user && profile) {
     return <Navigate to={isMaster ? "/master" : "/admin"} replace />;
   }
-  if (user && !profile) return null; // loading profile
+  if (user && !profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--creme)" }}>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
