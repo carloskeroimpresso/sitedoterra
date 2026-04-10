@@ -27,7 +27,7 @@ interface AuthContextType {
   isConsultant: boolean;
   isSuspended: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, fullName?: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, fullName?: string, username?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
   refreshProfile: () => Promise<void>;
@@ -48,22 +48,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .eq("id", userId)
       .maybeSingle();
     if (data) setProfile(data as UserProfile);
+    else setProfile(null);
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) await fetchProfile(session.user.id);
-      else setProfile(null);
-      setLoading(false);
-    });
+    let initialized = false;
 
+    // Busca sessão inicial primeiro
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) await fetchProfile(session.user.id);
+      if (session?.user) {
+        await fetchProfile(session.user.id);
+      }
       setLoading(false);
+      initialized = true;
+    });
+
+    // Escuta mudanças de auth após inicialização
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      // Ignorar o evento inicial que duplica o getSession
+      if (!initialized && _event === "INITIAL_SESSION") return;
+
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        await fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
+      if (initialized) setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -76,10 +90,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error: error?.message ?? null };
   };
 
-  const signUp = async (email: string, password: string, fullName?: string) => {
+  const signUp = async (email: string, password: string, fullName?: string, username?: string) => {
     const { error } = await supabase.auth.signUp({
       email, password,
-      options: { emailRedirectTo: window.location.origin, data: { full_name: fullName || "" } },
+      options: { emailRedirectTo: window.location.origin, data: { full_name: fullName || "", username: username || "" } },
     });
     return { error: error?.message ?? null };
   };
