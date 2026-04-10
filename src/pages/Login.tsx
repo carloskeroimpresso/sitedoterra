@@ -35,13 +35,13 @@ const Login = () => {
     }
 
     if (isSignUp) {
-      const { error } = await signUp(email, password, fullName);
+      const { error } = await signUp(email, password, fullName, username);
       if (error) toast.error(error);
       else toast.success("Conta criada! Verifique seu e-mail para confirmar.");
     } else {
       const { error } = await signIn(email, password);
       if (error) toast.error(error);
-      else navigate("/admin");
+      // Navigation handled by the redirect below when profile loads
     }
     setLoading(false);
   };
