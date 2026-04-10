@@ -42,6 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string): Promise<void> => {
+<<<<<<< HEAD
     try {
       const { data, error } = await supabase
         .from("profiles")
@@ -65,10 +66,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, 8000);
 
     // Padrão oficial Supabase: onAuthStateChange como fonte única de verdade
+=======
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, full_name, email, username, role, status, custom_domain, plan_id, subscription_status, subscription_expires_at")
+      .eq("id", userId)
+      .maybeSingle();
+    setProfile(data ? (data as UserProfile) : null);
+  };
+
+  useEffect(() => {
+    // Padrão oficial Supabase: onAuthStateChange como fonte única de verdade.
+    // O evento INITIAL_SESSION é disparado na inicialização com a sessão atual (ou null).
+>>>>>>> b0dae8eb4d0dbd90ccdf4f5ca69a1b1c79080431
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       clearTimeout(safetyTimer);
       setSession(session);
       setUser(session?.user ?? null);
+<<<<<<< HEAD
 
       if (session?.user) {
         await fetchProfile(session.user.id);
@@ -83,6 +98,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
+=======
+
+      if (session?.user) {
+        await fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
+
+      // Loading só termina após o primeiro evento (INITIAL_SESSION)
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+>>>>>>> b0dae8eb4d0dbd90ccdf4f5ca69a1b1c79080431
   }, []);
 
   const refreshProfile = async () => {
