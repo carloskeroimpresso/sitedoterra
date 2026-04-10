@@ -19,6 +19,15 @@ const ProtectedRoute = ({ children, requireMaster = false }: ProtectedRouteProps
 
   if (!user) return <Navigate to="/login" replace />;
 
+  // Aguarda o profile ser carregado antes de tomar decisões de role
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--creme)" }}>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
   if (isSuspended) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "var(--creme)" }}>
